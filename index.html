@@ -96,6 +96,50 @@
             height: 0;
         }
         
+        .btn-group{
+            position: relative;
+            display: inline-flex;
+        }
+        
+        .btn-group .btn:first-child {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+            border-right: none;
+        }
+        
+        .btn-group .btn:last-child {
+            padding: 0 8px;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        #randomSettingBtn{
+            border-radius: 0 8px 8px 0;
+        }
+
+        .btn-group .dropdown-content {
+            display: none;
+            width: 90px;
+            height: 1.5rem;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            min-width: 20px;
+            padding: 10px;
+        }
+        
+        .btn-group .dropdown-content.show {
+            display: flex;
+        }
+        
+        .btn-group .dropdown-content input {
+            width: calc(100% - 25%);
+        }
+
         .slider {
             position: absolute;
             cursor: pointer;
@@ -350,7 +394,16 @@
                     <button class="font-size-btn" id="decreaseFontBtn">A-</button>
                     <button class="font-size-btn" id="increaseFontBtn">A+</button>
                 </div>
-                <button id="randomSelectBtn" class="btn">隨機選擇</button>
+
+                <div class="btn-group">
+                    <button id="randomSelectBtn" class="btn">隨機選擇</button>
+                    <button id="randomSettingBtn" class="btn"><i class="fas fa-caret-down"></i></button>
+                    <div id="randomDropdown" class="dropdown-content">
+                        <input type="number" id="randomCountInput" min="1" placeholder="請輸入數量">
+                        <button id="setRandomCountBtn" class="btn">✔</button>
+                    </div>
+                </div>
+
                 <button id="viewHistoryBtn" class="btn">歷史記錄</button>
             </div>
         </div>
@@ -721,11 +774,6 @@
             searchSongs();
         });
 
-        // 點擊搜尋結果區域時，不關閉結果
-        $('#searchResults').on('mousedown', function() {
-            isSelecting = true;
-        });
-
         // 即時搜尋功能
         function searchSongs() {
             const searchTerm = $('#searchInput').val().toLowerCase().trim().replace(/\s+/g, '');
@@ -744,24 +792,40 @@
 
         // 隨機選擇
         $('#randomSelectBtn').click(function() {
-            const count = prompt('請輸入要隨機選擇的歌曲數量:', randomSongCount);
-            if (count) {
-                const newCount = parseInt(count);
-                if (!isNaN(newCount) && newCount > 0) {
-                    randomSongCount = newCount;
-                    saveSettings();
-                    
-                    // 隨機選擇歌曲
-                    const availableForRandom = availableSongs.filter(song => 
-                        !selectedSongs.some(s => s.id === song.id)
-                    );
-                    
-                    const randomSongs = availableForRandom
-                        .sort(() => 0.5 - Math.random())
-                        .slice(0, randomSongCount);
-                    
-                    randomSongs.forEach(song => addSong(song.id));
-                }
+            // 使用當前設定的數量直接進行隨機選擇
+            const availableForRandom = availableSongs.filter(song => 
+                !selectedSongs.some(s => s.id === song.id)
+            );
+            
+            const randomSongs = availableForRandom
+                .sort(() => 0.5 - Math.random())
+                .slice(0, randomSongCount);
+            
+            randomSongs.forEach(song => addSong(song.id));
+        });
+
+        // 設定按鈕的點擊事件
+        $('#randomSettingBtn').click(function(e) {
+            e.stopPropagation();
+            $('#randomDropdown').toggleClass('show');
+            $('#randomCountInput').val(randomSongCount);
+        });
+
+        // 確認設定新的隨機數量
+        $('#setRandomCountBtn').click(function() {
+            const newCount = parseInt($('#randomCountInput').val());
+            if (!isNaN(newCount) && newCount > 0) {
+                randomSongCount = newCount;
+                saveSettings();
+                $('#randomDropdown').removeClass('show');
+                showFloatingMessage('已更新隨機選擇數量');
+            }
+        });
+
+        // 點擊其他地方關閉下拉選單
+        $(document).click(function(e) {
+            if (!$(e.target).closest('.btn-group').length) {
+                $('.dropdown-content').removeClass('show');
             }
         });
         
