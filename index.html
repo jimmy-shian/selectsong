@@ -64,11 +64,16 @@
             padding-bottom: 10px;
             border-bottom: 1px solid var(--border-color);
         }
-
+            .header h2{
+                    display: block;
+            }
+        
         .settings-panel {
             display: flex;
             align-items: center;
             gap: 15px;
+            flex-wrap: wrap;
+
         }
 
         .theme-toggle {
@@ -317,7 +322,9 @@
                 align-items: flex-start;
                 gap: 10px;
             }
-
+            .header h2{
+                display: none;
+            }
             .settings-panel {
                 width: 100%;
                 justify-content: space-between;
@@ -328,7 +335,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h3>歌曲選擇系統</h3>
+            <h2>歌曲選擇系統</h2>
             <div class="settings-panel">
                 <div class="theme-toggle">
                     <i class="fas fa-sun" id="lightIcon" style="margin-right: 5px;"></i>
@@ -631,7 +638,7 @@
             });
             
             // 自動滾動到底部
-            $selectedSongs.scrollTop($selectedSongs[0].scrollHeight);
+            // $selectedSongs.scrollTop($selectedSongs[0].scrollHeight);
             
             // 啟用拖曳排序
             $selectedSongs.sortable({
@@ -655,8 +662,13 @@
             const song = availableSongs.find(s => s.id === songId);
             if (song && !selectedSongs.some(s => s.id === songId)) {
                 selectedSongs.push(song);
+                
+                
                 renderSelectedSongs();
                 renderSongList(); // 重新渲染歌曲列表以更新按鈕狀態
+                const $selectedSongs = $('#selectedSongs');
+                // 自動滾動到底部
+                $selectedSongs.scrollTop($selectedSongs[0].scrollHeight);
                 saveSettings();
             }
         }
@@ -699,9 +711,24 @@
             saveSettings();
         }
 
-        // 即時搜尋功能
+        // 即時搜尋功能（輸入事件）
         $('#searchInput').on('input', function() {
-            const searchTerm = $(this).val().toLowerCase();
+            searchSongs();
+        });
+
+        // 當輸入框獲得焦點時，也執行搜尋
+        $('#searchInput').on('focus', function() {
+            searchSongs();
+        });
+
+        // 點擊搜尋結果區域時，不關閉結果
+        $('#searchResults').on('mousedown', function() {
+            isSelecting = true;
+        });
+
+        // 即時搜尋功能
+        function searchSongs() {
+            const searchTerm = $('#searchInput').val().toLowerCase().trim().replace(/\s+/g, '');
             if (searchTerm.trim() === '') {
                 renderSongList();
                 return;
@@ -713,7 +740,7 @@
             );
             
             renderSongList(filteredSongs);
-        });
+        };
 
         // 隨機選擇
         $('#randomSelectBtn').click(function() {
@@ -808,6 +835,7 @@
                 $('html, body').animate({
                     scrollTop: $(document).height() - $(window).height()
                 }, 200);
+                $('#adminPassword').focus();
             });
             
             // 如果已經登入，直接顯示管理區域
@@ -822,6 +850,12 @@
         });
         
         // 驗證密碼
+        $('#adminPassword').on('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // 防止按 Enter 觸發其他默認行為
+                $('#verifyPasswordBtn').click(); // 模擬點擊驗證密碼按鈕
+            }
+        });
         $('#verifyPasswordBtn').click(function() {
             const password = $('#adminPassword').val();
             const $btn = $(this);
@@ -842,6 +876,10 @@
                     if (data.success) {  // 根據你的 API 結果，這裡是 success 屬性
                         $('#passwordSection').hide();
                         $('#songManagementSection').show();
+                        // 在面板完全展開後，使用jQuery的animate方法平滑滾動到底部
+                        $('html, body').animate({
+                            scrollTop: $(document).height() - $(window).height()
+                        }, 200);
                         isAdminLoggedIn = true;
                         saveSettings(); // 保存登入狀態
                     } else {
@@ -860,8 +898,8 @@
 
         // 新增歌曲
         $('#addSongBtn').click(function() {
-            const songId = $('#newSongId').val().trim();
-            const songName = $('#newSongName').val().trim();
+            const songId = $('#newSongId').val().trim().replace(/\s+/g, '');
+            const songName = $('#newSongName').val().trim().replace(/\s+/g, '');
             const $btn = $(this);
             const originalText = "新增歌曲";
             // 禁用按鈕並顯示載入指示器
@@ -908,14 +946,24 @@
                 } else {
                     // 全新的歌曲，直接新增
                     addNewSong(songId, songName);
-                    getSongs();
+                    setTimeout(function() {
+                        getSongs();
+                        const $songList = $('#songList');
+                        // 自動滾動到底部
+                        $songList.scrollTop($songList[0].scrollHeight);
+                    }, 1500);  // 延遲 1.5 秒執行 getSongs()
                     return;
                 }
                 
                 // 需要確認的情況
                 if (confirm(confirmMessage)) {
                     addNewSong(songId, songName);
-                    getSongs();
+                    setTimeout(function() {
+                        getSongs();
+                        const $songList = $('#songList');
+                        // 自動滾動到底部
+                        $songList.scrollTop($songList[0].scrollHeight);
+                    }, 1500);  // 延遲 1.5 秒執行 getSongs()
                 }
             } else {
                 // 恢復按鈕狀態
@@ -930,25 +978,6 @@
         // 實際新增歌曲的函數
         function addNewSong(songId, songName) {
             addSongToSheet(songId, songName)
-
-            // const newSong = { id: songId, name: songName };
-            // availableSongs.push(newSong);
-            // renderSongList();
-            
-            // // 清空輸入框
-            // $('#newSongId').val('');
-            // $('#newSongName').val('');
-            
-            // // 顯示成功訊息
-            // const existingSongWithSameName = availableSongs.filter(song => 
-            //     song.name === songName && song.id !== songId
-            // ).length > 0;
-            
-            // if (existingSongWithSameName) {
-            //     alert('新增曲號成功！');
-            // } else {
-            //     alert('新增歌曲成功！');
-            // }
         }
 
         // 從Google Sheet載入歌單
@@ -1080,12 +1109,6 @@
         $(document).ready(function() {
             // 從song.txt加載歌曲數據
             loadSongsFromFile();
-            
-            // 加載用戶設定
-            loadSettings();
-            
-            // 初始渲染歌曲列表
-            renderSongList();
         });
         
         // 將函數暴露到全局作用域，以便在HTML中調用
