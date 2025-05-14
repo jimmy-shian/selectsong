@@ -962,15 +962,35 @@
 
         // 新增歌曲
         $('#addSongBtn').click(function() {
-            const songId = $('#newSongId').val().trim().replace(/\s+/g, '');
-            const songName = $('#newSongName').val().trim().replace(/\s+/g, '');
+            let songId = $('#newSongId').val().trim();
+            let songName = $('#newSongName').val().trim();
             const $btn = $(this);
             const originalText = "新增歌曲";
+            
             // 禁用按鈕並顯示載入指示器
             $btn.prop('disabled', true).html(loadingHtml);
-
-            if (songId && songName) {
+            
+            // 如果ID或名稱為空，嘗試從另一個輸入框中解析多行文本
+            if ((!songId || !songName) && (songId || songName)) {
+                const inputText = songId || songName;
+                const lines = inputText.split('\n').filter(line => line.trim() !== '');
                 
+                if (lines.length >= 2) {
+                    // 第一行作為ID，第二行作為名稱
+                    songId = lines[0].trim();
+                    songName = lines[1].trim();
+                    
+                    // 更新輸入框的值
+                    $('#newSongId').val(songId);
+                    $('#newSongName').val(songName);
+                }
+            } else {
+                // 如果兩個輸入框都有值，則直接使用
+                songId = songId.replace(/\s+/g, '');
+                songName = songName.replace(/\s+/g, '');
+            }
+            
+            if (songId && songName) {
                 // 檢查是否已存在相同曲號和歌名
                 const existingSongWithSameIdAndName = availableSongs.find(song => 
                     song.id === songId && song.name === songName
@@ -978,9 +998,7 @@
                 
                 if (existingSongWithSameIdAndName) {
                     // 恢復按鈕狀態
-                    if ($btn) {
-                        $btn.prop('disabled', false).text(originalText);
-                    }
+                    $btn.prop('disabled', false).text(originalText);
                     showFloatingMessage('已存在相同曲號和歌名的歌曲');
                     return;
                 }
@@ -1000,12 +1018,9 @@
                 if (existingSongWithSameName) {
                     confirmMessage = `已存在歌名「${songName}」但曲號不同的歌曲，確定要新增嗎？`;
                 } else if (existingSongWithSameId) {
-                    confirmMessage = `已存在曲號「${songId}」但歌名不同的歌曲`;
                     // 恢復按鈕狀態
-                    if ($btn) {
-                        $btn.prop('disabled', false).text(originalText);
-                    }
-                    alert( confirmMessage );
+                    $btn.prop('disabled', false).text(originalText);
+                    alert(`已存在曲號「${songId}」但歌名不同的歌曲`);
                     return;
                 } else {
                     // 全新的歌曲，直接新增
@@ -1028,12 +1043,13 @@
                         // 自動滾動到底部
                         $songList.scrollTop($songList[0].scrollHeight);
                     }, 1500);  // 延遲 1.5 秒執行 getSongs()
+                } else {
+                    // 用戶取消，恢復按鈕狀態
+                    $btn.prop('disabled', false).text(originalText);
                 }
             } else {
                 // 恢復按鈕狀態
-                if ($btn) {
-                    $btn.prop('disabled', false).text(originalText);
-                }
+                $btn.prop('disabled', false).text(originalText);
                 showFloatingMessage('請輸入歌曲編號和名稱');
             }
 
