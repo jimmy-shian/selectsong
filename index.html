@@ -973,7 +973,7 @@
             // 如果ID或名稱為空，嘗試從另一個輸入框中解析多行文本
             if ((!songId || !songName) && (songId || songName)) {
                 const inputText = songId || songName;
-                const lines = inputText.split('\n').filter(line => line.trim() !== '');
+                const lines = inputText.split(' ').filter(line => line.trim() !== '');
                 
                 if (lines.length >= 2) {
                     // 第一行作為ID，第二行作為名稱
