@@ -46,6 +46,11 @@ function doGet(e) {
     try {
       var response = UrlFetchApp.fetch(url, {muteHttpExceptions: true});
       var content = response.getContentText();
+
+      // 將取得的 JSON 結果記錄到 Log 中
+      Logger.log('搜尋關鍵字：' + keyword);
+      Logger.log('API 回應內容：' + content);
+
       return ContentService.createTextOutput(content).setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       return ContentService.createTextOutput(JSON.stringify({error: 'relay error'})).setMimeType(ContentService.MimeType.JSON);
@@ -89,7 +94,9 @@ function doPost(e) {
       // 添加歌曲
       var songId = postData.songId || '';
       var songName = postData.songName || '';
-      result = addSong(songId, songName);
+      var songLang = postData.songLang || '';
+      var songSinger = postData.songSinger || '';
+      result = addSong(songId, songName, songLang, songSinger);
     }
   } else {
     result = { error: '未知的操作' };
@@ -112,14 +119,16 @@ function getAllSongs() {
     // 假設第一行是標題行，從第二行開始讀取
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      if (row[0] && row[1]) { // 確保歌號和歌名都有值
+      if (row[0] && row[1]) { // 至少需有曲號與名稱
         songs.push({
           id: row[0].toString(),
-          name: row[1].toString()
+          code: row[0].toString(),
+          name: row[1].toString(),
+          lang: row[2] ? row[2].toString() : '',
+          singer: row[3] ? row[3].toString() : ''
         });
       }
     }
-    
     return songs;
   } catch (e) {
     return { error: e.toString() };
@@ -129,7 +138,7 @@ function getAllSongs() {
 /**
  * 添加歌曲
  */
-function addSong(songId, songName) {
+function addSong(songId, songName, songLang, songSinger) {
   if (!songId || !songName) {
     return { success: false, message: '歌曲ID和名稱不能為空' };
   }
@@ -169,7 +178,7 @@ function addSong(songId, songName) {
     }
     
     // 添加新歌曲
-    sheet.appendRow([songId, songName]);
+    sheet.appendRow([songId, songName, songLang, songSinger]);
     
     // 根據情況返回不同的成功訊息
     if (existingSongWithSameId) {

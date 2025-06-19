@@ -448,6 +448,13 @@
                 <div style="margin-top: 15px;">
                     <input type="text" id="newSongId" placeholder="歌曲編號">
                     <input type="text" id="newSongName" placeholder="歌曲名稱">
+                    <input type="text" id="newSongLang" placeholder="歌曲語言" title="國、台、英" list="langList">
+                    <datalist id="langList">
+                        <option value="國">
+                        <option value="台">
+                        <option value="英">
+                    </datalist>
+                    <input type="text" id="newSongSinger" placeholder="歌手">
                     <button id="addSongBtn" class="btn">新增歌曲</button>
                 </div>
                 <div style="margin-top: 15px;">
@@ -478,7 +485,7 @@
         let songHistory = []; // 歷史記錄
 let searchToken = 0; // 用於避免多重 fetch 交錯
         let isAdminLoggedIn = false; // 管理員登入狀態
-        const gasApiUrl = 'https://script.google.com/macros/s/AKfycbwJkimtAGytgE8HyKu4Vduqgt9jU-hpwTurJ0K3sivn2TuU2t2zIK2kLE9FT76NyfrA/exec';
+        const gasApiUrl = 'https://script.google.com/macros/s/AKfycbxUoUD53Sf6Ej1ywmE8PaNiRcW0yuAc7fvb6uPhUq1r2O6Eq01AmXEgWI0jxb4csMcD/exec';
         
         // 載入指示器樣式
         const loadingHtml = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
@@ -518,10 +525,12 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                                 // 正常情況：ID 歌名
                                 const spaceParts = line.split(' ');
                                 const id = spaceParts[0].trim();
-                                const name = spaceParts.slice(1).join(' ').trim();
+                                const name = spaceParts[1].trim();
+                                const lang = spaceParts[2].trim();
+                                const singer = spaceParts[3].trim();
                                 
                                 if (id && name) {
-                                    songs.push({ id: id, name: name });
+                                    songs.push({ id: id, name: name, lang: lang, singer: singer });
                                 }
                             }
                         }
@@ -656,7 +665,7 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                 const isSelected = selectedSongs.some(s => s.id === song.id);
                 const $songItem = $(`
                     <div class="song-item" data-id="${song.id}">
-                        <span>${song.id} - ${song.name}</span>
+                       <span>${song.id} - ${song.name} <span style="color:#888;font-size:12px;">${song.lang ? song.lang + ' / ' : ''}${song.singer}</span></span>
                         <button class="btn btn-add" onclick="addSong('${song.id}')" ${isSelected ? 'disabled' : ''}>
                             ${isSelected ? '已選' : '+'}
                         </button>
@@ -682,6 +691,7 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                             <span class="drag-handle">☰</span>
                             <span class="song-number">${index + 1}.</span>
                             <span>${song.id} - ${song.name}</span>
+                            <span style="color:#888;font-size:12px;">${song.lang ? song.lang + ' / ' : ''}${song.singer}</span>
                         </div>
                         <div class="song-actions">
                             <button class="btn btn-delete" onclick="removeSong('${song.id}')">刪除</button>
@@ -758,11 +768,32 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
             }, 500);
         }
 
+        // function removeSong(songId) {
+        //     selectedSongs = selectedSongs.filter(song => song.id !== songId);
+        //     renderSelectedSongs();
+        //     renderSongList(); // 重新渲染歌曲列表以更新按鈕狀態
+        //     saveSettings();
+        // }
         function removeSong(songId) {
-            selectedSongs = selectedSongs.filter(song => song.id !== songId);
-            renderSelectedSongs();
-            renderSongList(); // 重新渲染歌曲列表以更新按鈕狀態
-            saveSettings();
+            const idStr = String(songId);          // 先轉成字串
+            const songObj      = selectedSongs.find(s => String(s.id) === idStr);
+            const existsInList = availableSongs.some(s => String(s.id) === idStr);
+
+            /* 直接移除的路徑 */
+            if (existsInList || !confirm('此歌曲尚未存入本地歌單，是否要儲存？')) {
+                selectedSongs = selectedSongs.filter(s => String(s.id) !== idStr);
+                renderSelectedSongs();
+                renderSongList();
+                saveSettings();
+                return;
+            }
+
+            /* 需要儲存的路徑 */
+            if (!$('#adminPanel').is(':visible')) $('#openAdminPanel').click();
+            $('#newSongId').val(songObj.id);
+            $('#newSongName').val(songObj.name);
+            $('#newSongLang').val(songObj.lang || '');
+            $('#newSongSinger').val(songObj.singer || '');
         }
 
         // 即時搜尋功能（輸入事件）
@@ -814,7 +845,10 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                         $remoteList.append('<div style="color:#888;">查無音圓曲庫資料</div>');
                     } else {
                         remoteSongs.forEach(song => {
-                            const isSelected = selectedSongs.some(s => s.id === song.code);
+                            if (availableSongs.some(s => String(s.id) === String(song.code))) {
+                                return;
+                            }
+                            const isSelected = selectedSongs.some(s => String(s.id) === String(song.code));
                             const $songItem = $(`
                                 <div class="song-item remote" data-id="${song.code}">
                                     <span>${song.code} - ${song.name} <span style="color:#888;font-size:12px;">${song.lang ? song.lang + ' / ' : ''}${song.singer}</span></span>
@@ -1009,6 +1043,8 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
         $('#addSongBtn').click(function() {
             let songId = $('#newSongId').val().trim();
             let songName = $('#newSongName').val().trim();
+            let songLang = $('#newSongLang').val().trim();
+            let songSinger = $('#newSongSinger').val().trim();
             const $btn = $(this);
             const originalText = "新增歌曲";
             
@@ -1073,7 +1109,7 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                     return;
                 } else {
                     // 全新的歌曲，直接新增
-                    addNewSong(songId, songName);
+                    addNewSong(songId, songName, songLang, songSinger);
                     setTimeout(function() {
                         getSongs();
                         const $songList = $('#songList');
@@ -1085,7 +1121,7 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                 
                 // 需要確認的情況
                 if (confirm(confirmMessage)) {
-                    addNewSong(songId, songName);
+                    addNewSong(songId, songName, songLang, songSinger);
                     setTimeout(function() {
                         getSongs();
                         const $songList = $('#songList');
@@ -1105,8 +1141,8 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
         });
         
         // 實際新增歌曲的函數
-        function addNewSong(songId, songName) {
-            addSongToSheet(songId, songName)
+        function addNewSong(songId, songName, songLang, songSinger) {
+            addSongToSheet(songId, songName, songLang, songSinger)
         }
 
         // 從Google Sheet載入歌單
@@ -1160,7 +1196,7 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
             });
         }
         // 新增歌曲到Google Sheet
-        function addSongToSheet(songId, songName) {
+        function addSongToSheet(songId, songName, songLang, songSinger) {
             const $btn = $('#addSongBtn');
             const originalText = "新增歌曲";
             
@@ -1178,7 +1214,9 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                         action: "addSong",
                         password: $('#adminPassword').val(),
                         songId: songId,
-                        songName: songName
+                        songName: songName,
+                        songLang: songLang,
+                        songSinger: songSinger
                     }),
                 function (data) {
                     console.log('API 回應: ' + JSON.stringify(data, null, 2)); // 格式化輸出
@@ -1239,7 +1277,7 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
             const $btn = $(this);
             const songId = $btn.data('id');
             const songName = $btn.data('name');
-            if (!selectedSongs.some(s => s.id === songId)){
+            if (!selectedSongs.some(s => s.id == songId)){
                 const songLang = $btn.data('lang') || '';
                 const songSinger = $btn.data('singer') || '';
                 selectedSongs.push({id: songId, name: songName, lang: songLang, singer: songSinger});
@@ -1249,8 +1287,11 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                 saveSettings();
             }
             // 自動填入管理區輸入框
+            if (!$('#adminPanel').is(':visible')) $('#openAdminPanel').click();
             $('#newSongId').val(songId);
             $('#newSongName').val(songName);
+            $('#newSongLang').val(songLang);
+            $('#newSongSinger').val(songSinger);
             // 若有語言與歌手也帶入（如有管理欄位可擴充）
         });
 
