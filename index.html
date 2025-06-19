@@ -712,7 +712,7 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
                     const newOrder = [];
                     $(this).find('.song-item').each(function() {
                         const songId = $(this).attr('data-id');
-                        const song = selectedSongs.find(s => s.id === songId);
+                        const song = selectedSongs.find(s => String(s.id) === String(songId));
                         if (song) newOrder.push(song);
                     });
                     selectedSongs = newOrder;
@@ -818,7 +818,8 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
             // 1. 本地搜尋
             const filteredSongs = availableSongs.filter(song => 
                 song.name.toLowerCase().includes(searchTerm) || 
-                song.id.toLowerCase().includes(searchTerm)
+                song.id.toLowerCase().includes(searchTerm) || 
+                song.singer.toLowerCase().includes(searchTerm)
             );
             $songList.empty();
             renderSongList(filteredSongs);
