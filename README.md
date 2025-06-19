@@ -1,8 +1,10 @@
-# 歌曲選擇系統
+# SelectSong ‧ 歌曲選擇系統
+
+> 一個以前端 `HTML / JavaScript` 為核心，並可與 Google Apps Script 整合的輕量化選歌工具。專案支援拖曳排序（含行動裝置觸控）、隨機選歌、本地設定持久化，以及 Google Sheet 雲端歌庫同步。
 
 這是一個簡單的歌曲選擇系統，允許用戶搜索、選擇和排序歌曲。系統支持拖曳排序（包括手機觸控操作）、隨機選擇歌曲、本地存儲設置，以及與Google Sheet集成。
 
-## 功能特點
+## 主要功能
 
 1. **拖曳排序**：使用拖曳方式重新排序已選歌曲，支持手機觸控操作
 2. **隨機選擇**：預設選擇10首歌曲，可自定義數量並保存設置
@@ -39,7 +41,7 @@ python gas_simulation.py
 
 ## 部署到Google Apps Script
 
-1. 創建一個Google Sheet，包含兩列：「歌號」和「歌名」
+1. 創建一個Google Sheet，包含四列：「歌號」、「歌名」、「語言」、「歌手」
 2. 打開Google Apps Script編輯器（從Google Sheet菜單：擴展功能 > Apps Script）
 3. 複製`google_apps_script.js`中的代碼到編輯器
 4. 修改`SHEET_ID`變量為您的Google Sheet ID
