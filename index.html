@@ -476,8 +476,9 @@
         let currentFontSize = 16; // 預設字體大小
         let isDarkMode = false; // 預設淺色模式
         let songHistory = []; // 歷史記錄
+let searchToken = 0; // 用於避免多重 fetch 交錯
         let isAdminLoggedIn = false; // 管理員登入狀態
-        const gasApiUrl = 'https://script.google.com/macros/s/AKfycbxMTkroKTitSG-YpK6SUI0llGw_h4O5nRHD4IrK1b-79DBI--UGWh1pGWubPzU0IAvY/exec';
+        const gasApiUrl = 'https://script.google.com/macros/s/AKfycbwJkimtAGytgE8HyKu4Vduqgt9jU-hpwTurJ0K3sivn2TuU2t2zIK2kLE9FT76NyfrA/exec';
         
         // 載入指示器樣式
         const loadingHtml = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
@@ -792,14 +793,20 @@
             renderSongList(filteredSongs);
 
             // 2. 音圓API查詢（遠端）
+            const thisToken = ++searchToken; // 記錄此次查詢的 token
             const keyword = encodeURIComponent($('#searchInput').val().trim());
             if (!keyword) return;
-            // 避免重複查詢（如空白）
+            // 清除先前的遠端查詢結果，避免重疊
+            $('#remote-loading, #remote-divider, #remote-title, #remote-song-list').remove();
+            // 顯示載入提示
             $songList.append('<div id="remote-loading" style="padding:10px;color:#888;">正在查詢音圓曲庫...</div>');
-            const apiUrl = `https://song.corp.com.tw/api/song.aspx?company=音圓&cusType=searchList&keyword=${encodeURIComponent(keyword)}`;
+            // 透過 Google Apps Script 轉發（解決 CORS）
+            const apiUrl = `${gasApiUrl}?action=relaySongApi&keyword=${encodeURIComponent(keyword)}`;
             fetch(apiUrl)
                 .then(res => res.json())
                 .then(function(remoteSongs) {
+                    // 若不是最新一次查詢，忽略結果
+                    if (thisToken !== searchToken) return;
                     $('#remote-loading').remove();
                     $songList.append('<div style="border-top:1px dashed #aaa;margin:10px 0 5px 0;"></div><div style="color:#4a6da7;font-weight:bold;margin-bottom:5px;">音圓曲庫查詢結果</div>');
                     const $remoteList = $('<div id="remote-song-list"></div>');
@@ -811,7 +818,7 @@
                             const $songItem = $(`
                                 <div class="song-item remote" data-id="${song.code}">
                                     <span>${song.code} - ${song.name} <span style="color:#888;font-size:12px;">${song.lang ? song.lang + ' / ' : ''}${song.singer}</span></span>
-                                    <button class="btn btn-add remote-add" data-id="${song.code}" ${isSelected ? 'disabled' : ''}>${isSelected ? '已選' : '+'}</button>
+                                    <button class="btn btn-add remote-add" data-id="${song.code}" data-name="${song.name}" data-lang="${song.lang || ''}" data-singer="${song.singer || ''}" ${isSelected ? 'disabled' : ''}>${isSelected ? '已選' : '+'}</button>
                                 </div>
                             `);
                             $remoteList.append($songItem);
@@ -819,28 +826,8 @@
                     }
                     $songList.append($remoteList);
 
-                    // 綁定遠端加歌按鈕事件
-                    $remoteList.find('.remote-add').off('click').on('click', function() {
-                        const songId = $(this).data('id');
-                        const song = remoteSongs.find(s => s.code === songId);
-                        if (song) {
-                            // 1. 加入已選清單（如未重複）
-                            if (!selectedSongs.some(s => s.id === song.code)) {
-                                selectedSongs.push({
-                                    id: song.code,
-                                    name: song.name,
-                                    lang: song.lang,
-                                    singer: song.singer
-                                });
-                                renderSelectedSongs();
-                                renderSongList();
-                                saveSettings();
-                            }
-                            // 2. 自動填入管理區輸入框
-                            $('#newSongId').val(song.code);
-                            $('#newSongName').val(song.name);
-                        }
-                    });
+
+
                 })
                 .catch(function() {
                     $('#remote-loading').remove();
@@ -1029,18 +1016,22 @@
             $btn.prop('disabled', true).html(loadingHtml);
             
             // 如果ID或名稱為空，嘗試從另一個輸入框中解析多行文本
+            // 若輸入框之一為空，嘗試從單輸入多資訊字串解析
             if ((!songId || !songName) && (songId || songName)) {
                 const inputText = songId || songName;
-                const lines = inputText.split(' ').filter(line => line.trim() !== '');
-                
-                if (lines.length >= 2) {
-                    // 第一行作為ID，第二行作為名稱
-                    songId = lines[0].trim();
-                    songName = lines[1].trim();
-                    
-                    // 更新輸入框的值
+                // 解析格式：ID 名稱 語言 / 其他 歌手
+                // 先分段
+                const parts = inputText.trim().split(/\s+/);
+                if (parts.length >= 3) {
+                    songId = parts[0];
+                    const singer = parts[parts.length - 1];
+                    const lang = parts[parts.length - 2] === '/' ? '' : parts[parts.length - 2];
+                    // 名稱位於 ID 與 lang 之間
+                    songName = parts.slice(1, parts.length - 2).join(' ');
+                    // 將解析結果填入
                     $('#newSongId').val(songId);
                     $('#newSongName').val(songName);
+                    // 若之後有 lang 與 singer 輸入框，可一併處理
                 }
             } else {
                 // 如果兩個輸入框都有值，則直接使用
@@ -1242,6 +1233,26 @@
         loadSettings();
         renderSongList();
         renderSelectedSongs();
+
+        // 事件委派：處理遠端加歌按鈕
+        $(document).on('click', '.remote-add', function(){
+            const $btn = $(this);
+            const songId = $btn.data('id');
+            const songName = $btn.data('name');
+            if (!selectedSongs.some(s => s.id === songId)){
+                const songLang = $btn.data('lang') || '';
+                const songSinger = $btn.data('singer') || '';
+                selectedSongs.push({id: songId, name: songName, lang: songLang, singer: songSinger});
+                renderSelectedSongs();
+                // 將當前列表中所有同曲號的按鈕設為已選，避免重複加入
+                $(`.song-item[data-id="${songId}"] .btn-add`).prop('disabled', true).text('已選');
+                saveSettings();
+            }
+            // 自動填入管理區輸入框
+            $('#newSongId').val(songId);
+            $('#newSongName').val(songName);
+            // 若有語言與歌手也帶入（如有管理欄位可擴充）
+        });
 
         // 頁面加載時初始化
         $(document).ready(function() {

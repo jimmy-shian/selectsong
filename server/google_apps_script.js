@@ -39,6 +39,17 @@ function doGet(e) {
     // 驗證密碼
     var password = e.parameter.password || '';
     result = (password === PASSWORD) ? { success: true, message: '驗證成功' } : { success: false, message: '密碼錯誤' };
+  } else if (action === 'relaySongApi') {
+    // 轉發音圓 API 查詢
+    var keyword = e.parameter.keyword || '';
+    var url = 'https://song.corp.com.tw/api/song.aspx?company=音圓&cusType=searchList&keyword=' + encodeURIComponent(keyword);
+    try {
+      var response = UrlFetchApp.fetch(url, {muteHttpExceptions: true});
+      var content = response.getContentText();
+      return ContentService.createTextOutput(content).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({error: 'relay error'})).setMimeType(ContentService.MimeType.JSON);
+    }
   } else {
     result = { error: '密碼錯誤' };
   }
