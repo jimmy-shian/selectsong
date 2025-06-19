@@ -775,19 +775,87 @@
         });
 
         // 即時搜尋功能
+        // 整合本地與音圓API查詢
         function searchSongs() {
             const searchTerm = $('#searchInput').val().toLowerCase().trim().replace(/\s+/g, '');
+            const $songList = $('#songList');
             if (searchTerm.trim() === '') {
                 renderSongList();
                 return;
             }
-            
+            // 1. 本地搜尋
             const filteredSongs = availableSongs.filter(song => 
                 song.name.toLowerCase().includes(searchTerm) || 
                 song.id.toLowerCase().includes(searchTerm)
             );
-            
+            $songList.empty();
             renderSongList(filteredSongs);
+
+            // 2. 音圓API查詢（遠端）
+            const keyword = encodeURIComponent($('#searchInput').val().trim());
+            if (!keyword) return;
+            // 避免重複查詢（如空白）
+            const apiUrl = `https://song.corp.com.tw/songs.aspx?company=%E9%9F%B3%E5%9C%93&keyword=${keyword}`;
+            // 顯示載入提示
+            $songList.append('<div id="remote-loading" style="padding:10px;color:#888;">正在查詢音圓曲庫...</div>');
+            fetch(apiUrl)
+                .then(res => res.text())
+                .then(html => {
+                    $('#remote-loading').remove();
+                    // 解析音圓API回傳HTML，抽取歌曲資訊
+                    const $remote = $(html);
+                    const remoteSongs = [];
+                    $remote.find('li').each(function() {
+                        const $li = $(this);
+                        const code = $li.find('.code').text().trim();
+                        const name = $li.find('.name').text().trim();
+                        const lang = $li.find('.lang').text().trim();
+                        const singer = $li.find('.singer').text().trim();
+                        if (code && name) {
+                            remoteSongs.push({
+                                id: code,
+                                name,
+                                lang,
+                                singer
+                            });
+                        }
+                    });
+                    // 分隔線與標題
+                    $songList.append('<div style="border-top:1px dashed #aaa;margin:10px 0 5px 0;"></div><div style="color:#4a6da7;font-weight:bold;margin-bottom:5px;">音圓曲庫查詢結果</div>');
+                    // 渲染遠端歌單（用本地樣式）
+                    const $remoteList = $('<div id="remote-song-list"></div>');
+                    if (remoteSongs.length === 0) {
+                        $remoteList.append('<div style="color:#888;">查無音圓曲庫資料</div>');
+                    } else {
+                        remoteSongs.forEach(song => {
+                            const isSelected = selectedSongs.some(s => s.id === song.id);
+                            const $songItem = $(`
+                                <div class="song-item remote" data-id="${song.id}">
+                                    <span>${song.id} - ${song.name} <span style=\"color:#888;font-size:12px;\">${song.lang ? song.lang + ' / ' : ''}${song.singer}</span></span>
+                                    <button class="btn btn-add remote-add" data-id="${song.id}" ${isSelected ? 'disabled' : ''}>${isSelected ? '已選' : '+'}</button>
+                                </div>
+                            `);
+                            $remoteList.append($songItem);
+                        });
+                    }
+                    $songList.append($remoteList);
+
+                    // 綁定遠端加歌按鈕事件
+                    $remoteList.find('.remote-add').off('click').on('click', function() {
+                        const songId = $(this).data('id');
+                        const song = remoteSongs.find(s => s.id === songId);
+                        if (song && !selectedSongs.some(s => s.id === songId)) {
+                            selectedSongs.push(song);
+                            renderSelectedSongs();
+                            renderSongList(); // 重新渲染本地歌單與按鈕狀態
+                            saveSettings();
+                        }
+                    });
+                })
+                .catch(err => {
+                    $('#remote-loading').remove();
+                    $songList.append('<div style="color:red;">音圓曲庫查詢失敗</div>');
+                });
         };
 
         // 隨機選擇
