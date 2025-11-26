@@ -21,6 +21,32 @@ let searchToken = 0; // 用於避免多重 fetch 交錯
 let isAdminLoggedIn = false; // 管理員登入狀態
 const gasApiUrl = 'https://script.google.com/macros/s/AKfycbxUoUD53Sf6Ej1ywmE8PaNiRcW0yuAc7fvb6uPhUq1r2O6Eq01AmXEgWI0jxb4csMcD/exec';
 
+// 篩選器狀態
+let currentLangFilter = 'all';
+let currentGenderFilter = 'all';
+
+// 男女歌手列表 (根據 song.txt 資料整理)
+const maleSingers = [
+    '張學友', '周杰倫', '邰正宵', '阿杜', '張宇',
+    '范逸臣', '王力宏', '李聖傑', '陳勢安', '趙傳',
+    '黃品源', '胡夏', '蘇打綠', '林俊傑',
+    '庾澄慶', '蕭煌奇', '譚詠麟', '周興哲', '韋禮安',
+    '楊培安', '陳奕迅', '郭桂彬', '施文彬', '周傳雄',
+    'MP魔幻力量', '五月天'
+];
+const femaleSingers = [
+    '陳潔儀', '黃乙玲', '江蕙', '家家', '田馥甄',
+    '那英', '梅艷芳', '丁噹', '陳嘉樺Ella', '蔡依林',
+    '鄧麗君', 'A-Lin', '王菲', '張惠妹', '張韶涵',
+    '陳淑樺', '楊丞琳', '朱俐靜', '王心凌', '梁靜茹',
+    '黃小琥', '范瑋琪', '彭佳慧', '梁文音', '鄧紫棋',
+    '郁可唯', '梁詠琪', '何耀珊', '劉若英', '彭羚',
+    '辛曉琪', 'S.H.E', '徐若瑄', '黃美珍', '陳盈潔',
+    '孫燕姿', '郭靜', '戴愛玲', '李千娜', '曾沛慈',
+    '葉蒨文', '林憶蓮', '郭采潔', '于文文', '梁心頤',
+    '袁詠琳', '徐佳瑩', 'F.I.R.', 'BY2', '南拳媽媽'
+];
+
 // 載入指示器樣式
 const loadingHtml = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
 
@@ -36,7 +62,7 @@ function loadSongsFromFile() {
         .then(data => {
             const lines = data.split('\n');
             const songs = [];
-            
+
             lines.forEach(line => {
                 line = line.trim();
                 if (line) {
@@ -48,7 +74,7 @@ function loadSongsFromFile() {
                         const spaceParts = restParts.split(' ');
                         const secondId = spaceParts[0].trim();
                         const name = spaceParts.slice(1).join(' ').trim();
-                        
+
                         if (id && name) {
                             songs.push({ id: id, name: name });
                         }
@@ -56,20 +82,19 @@ function loadSongsFromFile() {
                             songs.push({ id: secondId, name: name });
                         }
                     } else {
-                        // 正常情況：ID 歌名
-                        const spaceParts = line.split(' ');
-                        const id = spaceParts[0].trim();
-                        const name = spaceParts[1].trim();
-                        const lang = spaceParts[2].trim();
-                        const singer = spaceParts[3].trim();
-                        
+                        // 正常情況：ID 歌名 語言 歌手
+                        const parts = line.includes('\t')
+                            ? line.split('\t')
+                            : line.split(' ');
+                        const [id, name, lang, singer] = parts.map(p => p ? p.trim() : '');
+
                         if (id && name) {
-                            songs.push({ id: id, name: name, lang: lang, singer: singer });
+                            songs.push({ id: id, name: name, lang: lang || '', singer: singer || '' });
                         }
                     }
                 }
             });
-            
+
             if (songs.length > 0) {
                 availableSongs = songs;
             } else {
@@ -77,7 +102,7 @@ function loadSongsFromFile() {
                 availableSongs = [...ORIGINAL_SONGS];
                 console.error('無法從文件加載歌曲，使用備用數據');
             }
-            
+
             // 渲染歌曲列表
             renderSongList();
         })
@@ -121,7 +146,7 @@ function loadSettings() {
     if (savedCount) {
         randomSongCount = parseInt(savedCount);
     }
-    
+
     // 讀取已選歌曲
     const savedSongs = localStorage.getItem('selectedSongs');
     if (savedSongs) {
@@ -129,7 +154,7 @@ function loadSettings() {
             const parsedSongs = JSON.parse(savedSongs);
             selectedSongs = parsedSongs;
             renderSelectedList();
-        } catch (e) {   
+        } catch (e) {
             console.error('無法解析已儲存的歌曲', e);
         }
     }
@@ -159,7 +184,7 @@ function loadSettings() {
         document.body.classList.add('dark-mode');
         $('#themeToggle').prop('checked', true);
     }
-    
+
     // 讀取管理員登入狀態
     const savedLoginState = localStorage.getItem('adminLoggedIn');
     const password = $('#adminPassword').val().trim(); // 確保去除空白
@@ -186,19 +211,30 @@ function updateFontSize() {
 // 渲染歌曲列表
 function renderSongList(filteredSongs = null) {
     const $songList = $('#songList');
-    // Detach remote results to preserve them during local list re-render
     const $remoteResults = $('#remote-divider, #remote-title, #remote-song-list').detach();
     $songList.empty();
-    
+
     const songsToRender = filteredSongs || availableSongs;
-    
+
     if (songsToRender.length === 0 && $('#searchInput').val().trim() !== '') {
-         $songList.html('<div class="song-item">沒有符合的本地歌曲</div>');
+        $songList.html('<div class="song-item">沒有符合的本地歌曲</div>');
     } else if (songsToRender.length > 0) {
         songsToRender.forEach(song => {
             const isSelected = selectedSongs.some(s => String(s.id) === String(song.id));
+
+            // ★★★ 添加這段：判斷歌手性別 ★★★
+            let gender = 'none';
+            if (song.singer) {
+                if (maleSingers.some(male => song.singer.includes(male))) {
+                    gender = 'male';
+                } else if (femaleSingers.some(female => song.singer.includes(female))) {
+                    gender = 'female';
+                }
+            }
+            // ★★★ 添加結束 ★★★
+
             const $songItem = $(`
-                <div class="song-item" data-id="${song.id}">
+                <div class="song-item" data-id="${song.id}" data-gender="${gender}">
                    <span>${song.id} - ${song.name} <span style="color:#888;font-size:12px;">${song.lang ? song.lang + ' / ' : ''}${song.singer}</span></span>
                     <button class="btn btn-add" data-id="${song.id}" data-name="${song.name}" data-lang="${song.lang || ''}" data-singer="${song.singer || ''}" ${isSelected ? 'disabled' : ''}>
                         ${isSelected ? '已選' : '+'}
@@ -208,22 +244,32 @@ function renderSongList(filteredSongs = null) {
             $songList.append($songItem);
         });
     }
-    // Re-append remote results
     $songList.append($remoteResults);
 }
 
-function renderSelectedList() { // Renamed for clarity
+function renderSelectedList() {
     const $selectedSongs = $('#selectedSongs');
     $selectedSongs.empty();
-    
+
     if (selectedSongs.length === 0) {
         $selectedSongs.html('<div class="song-item">尚未選擇歌曲</div>');
         return;
     }
-    
+
     selectedSongs.forEach((song, index) => {
+        // ★★★ 添加這段：判斷歌手性別 ★★★
+        let gender = 'none';
+        if (song.singer) {
+            if (maleSingers.some(male => song.singer.includes(male))) {
+                gender = 'male';
+            } else if (femaleSingers.some(female => song.singer.includes(female))) {
+                gender = 'female';
+            }
+        }
+        // ★★★ 添加結束 ★★★
+
         const $songItem = $(`
-            <div class="song-item" data-id="${song.id}" data-index="${index}">
+            <div class="song-item" data-id="${song.id}" data-index="${index}" data-gender="${gender}">
                 <div>
                     <span class="drag-handle">☰</span>
                     <span class="song-number">${index + 1}.</span>
@@ -237,13 +283,12 @@ function renderSelectedList() { // Renamed for clarity
         `);
         $selectedSongs.append($songItem);
     });
-    
     $selectedSongs.sortable({
         handle: '.drag-handle',
         axis: 'y',
-        update: function(event, ui) {
+        update: function (event, ui) {
             const newOrder = [];
-            $(this).find('.song-item').each(function() {
+            $(this).find('.song-item').each(function () {
                 const songId = $(this).attr('data-id');
                 const song = selectedSongs.find(s => String(s.id) === String(songId));
                 if (song) newOrder.push(song);
@@ -260,38 +305,38 @@ function saveToHistory() {
         showFloatingMessage('沒有選擇歌曲，無法保存');
         return;
     }
-    
+
     const $btn = $('#saveCurrentBtn');
     const originalText = $btn.text();
-    
+
     // 禁用按鈕並顯示載入指示器
     $btn.prop('disabled', true).html(loadingHtml);
-    
+
     // 模擬保存過程（實際上是立即的，但為了UI一致性添加短暫延遲）
-    setTimeout(function() {
+    setTimeout(function () {
         const timestamp = new Date().toLocaleString();
         const historyItem = {
             id: Date.now(), // 使用時間戳作為唯一ID
             timestamp: timestamp,
             songs: [...selectedSongs]
         };
-        
+
         songHistory.unshift(historyItem); // 添加到歷史記錄的開頭
         saveSettings();
         showFloatingMessage('已保存到歷史記錄');
-        
+
         // 恢復按鈕狀態
         $btn.prop('disabled', false).text(originalText);
     }, 500);
 }
 
 // 即時搜尋功能（輸入事件）
-$('#searchInput').on('input', function() {
+$('#searchInput').on('input', function () {
     searchSongs();
 });
 
 // 當輸入框獲得焦點時，也執行搜尋
-$('#searchInput').on('focus', function() {
+$('#searchInput').on('focus', function () {
     searchSongs();
 });
 
@@ -307,7 +352,22 @@ function renderRemoteResults(remoteSongs, currentToken) {
         remoteSongs.forEach(song => {
             if (availableSongs.some(s => String(s.id) === String(song.code))) { return; }
             const isSelected = selectedSongs.some(s => String(s.id) === String(song.code));
-            const $songItem = $(`<div class="song-item remote" data-id="${song.code}"><span>${song.code} - ${song.name} <span style="color:#888;font-size:12px;">${song.lang ? song.lang + ' / ' : ''}${song.singer}</span></span><button class="btn btn-add remote-add" data-id="${song.code}" data-name="${song.name}" data-lang="${song.lang || ''}" data-singer="${song.singer || ''}" ${isSelected ? 'disabled' : ''}>${isSelected ? '已選' : '+'}</button></div>`);
+            let gender = 'none';
+            if (song.singer) {
+                if (maleSingers.some(male => song.singer.includes(male))) {
+                    gender = 'male';
+                } else if (femaleSingers.some(female => song.singer.includes(female))) {
+                    gender = 'female';
+                }
+            }
+            const $songItem = $(`
+                <div class="song-item remote" data-id="${song.code}" data-gender="${gender}">
+                    <span>${song.code} - ${song.name} <span style="color:#888;font-size:12px;">${song.lang ? song.lang + ' / ' : ''}${song.singer}</span></span>
+                    <button class="btn btn-add remote-add" data-id="${song.code}" data-name="${song.name}" data-lang="${song.lang || ''}" data-singer="${song.singer || ''}" ${isSelected ? 'disabled' : ''}>
+                        ${isSelected ? '已選' : '+'}
+                    </button>
+                </div>
+            `);
             $remoteList.append($songItem);
         });
     }
@@ -317,11 +377,19 @@ function searchSongs() {
     const rawSearchTerm = $('#searchInput').val().trim();
     const searchTerm = rawSearchTerm.toLowerCase().replace(/\s+/g, '');
     const $songList = $('#songList');
-    if (searchTerm === '') {
-        renderSongList();
-        return;
+
+    // 先根據語言和性別過濾
+    let filteredSongs = applyFilters(availableSongs);
+
+    // 再根據搜尋關鍵字過濾
+    if (searchTerm !== '') {
+        filteredSongs = filteredSongs.filter(song =>
+            song.name.toLowerCase().includes(searchTerm) ||
+            song.id.toLowerCase().includes(searchTerm) ||
+            (song.singer && song.singer.toLowerCase().includes(searchTerm))
+        );
     }
-    const filteredSongs = availableSongs.filter(song => song.name.toLowerCase().includes(searchTerm) || song.id.toLowerCase().includes(searchTerm) || song.singer.toLowerCase().includes(searchTerm));
+
     $songList.empty();
     renderSongList(filteredSongs);
     const thisToken = ++searchToken;
@@ -334,11 +402,11 @@ function searchSongs() {
     }
     $songList.append('<div id="remote-loading" style="padding:10px;color:#888;">正在查詢音圓曲庫...</div>');
     const apiUrl = `${gasApiUrl}?action=relaySongApi&keyword=${keyword}`;
-    fetch(apiUrl).then(res => res.json()).then(function(remoteSongs) {
+    fetch(apiUrl).then(res => res.json()).then(function (remoteSongs) {
         if (thisToken !== searchToken) return;
         remoteSearchCache[keyword] = remoteSongs;
         renderRemoteResults(remoteSongs, thisToken);
-    }).catch(function() {
+    }).catch(function () {
         if (thisToken !== searchToken) return;
         $('#remote-loading').remove();
         $songList.append('<div style="color:red;">音圓曲庫查詢失敗</div>');
@@ -346,12 +414,12 @@ function searchSongs() {
 };
 
 // 隨機選擇
-$('#randomSelectBtn').click(function() {
+$('#randomSelectBtn').click(function () {
     // 使用當前設定的數量直接進行隨機選擇
-    const availableForRandom = availableSongs.filter(song => 
+    const availableForRandom = availableSongs.filter(song =>
         !selectedSongs.some(s => String(s.id) === String(song.id))
     );
-    
+
     const randomSongs = availableForRandom
         .sort(() => 0.5 - Math.random())
         .slice(0, randomSongCount);
@@ -374,21 +442,21 @@ $('#randomSelectBtn').click(function() {
 
     // 更新按鈕狀態
     randomSongs.forEach(song => {
-        $(`.song-item[data-id="${song.id}"]`).find('.btn-add, .remote-add').text('已選').prop('disabled', true);
+        $(`.song - item[data - id="${song.id}"]`).find('.btn-add, .remote-add').text('已選').prop('disabled', true);
     });
-    
+
     showFloatingMessage(`已隨機加入 ${randomSongs.length} 首歌曲`);
 });
 
 // 設定按鈕的點擊事件
-$('#randomSettingBtn').click(function(e) {
+$('#randomSettingBtn').click(function (e) {
     e.stopPropagation();
     $('#randomDropdown').toggleClass('show');
     $('#randomCountInput').val(randomSongCount);
 });
 
 // 確認設定新的隨機數量
-$('#setRandomCountBtn').click(function() {
+$('#setRandomCountBtn').click(function () {
     const newCount = parseInt($('#randomCountInput').val());
     if (!isNaN(newCount) && newCount > 0) {
         randomSongCount = newCount;
@@ -399,7 +467,7 @@ $('#setRandomCountBtn').click(function() {
 });
 
 // 點擊其他地方關閉下拉選單
-$(document).click(function(e) {
+$(document).click(function (e) {
     if (!$(e.target).closest('.btn-group').length) {
         $('.dropdown-content').removeClass('show');
     }
@@ -409,15 +477,15 @@ $(document).click(function(e) {
 function renderHistory() {
     const $historyList = $('#historyList');
     $historyList.empty();
-    
+
     if (songHistory.length === 0) {
         $historyList.html('<div class="song-item">沒有歷史記錄</div>');
         return;
     }
-    
+
     songHistory.forEach((history, index) => {
         const $historyItem = $(`
-            <div class="song-item" data-id="${history.id}">
+    < div class="song-item" data - id="${history.id}" >
                 <div>
                     <span class="song-number">${index + 1}.</span>
                     <span>${history.timestamp} (${history.songs.length}首)</span>
@@ -426,8 +494,8 @@ function renderHistory() {
                     <button class="btn" onclick="loadHistory(${history.id})">載入</button>
                     <button class="btn btn-remove" onclick="deleteHistory(${history.id})">刪除</button>
                 </div>
-            </div>
-        `);
+            </div >
+    `);
         $historyList.append($historyItem);
     });
 }
@@ -456,32 +524,34 @@ function deleteHistory(historyId) {
 }
 
 // 查看歷史記錄按鈕
-$('#viewHistoryBtn').click(function() {
+$('#viewHistoryBtn').click(function () {
     renderHistory();
     // 使用slideToggle來進行平滑的顯示/隱藏
     $('#historyPanel').slideToggle(300);
 });
 
 // 關閉歷史記錄面板
-$('#closeHistoryBtn').click(function() {
+$('#closeHistoryBtn').click(function () {
     $('#historyPanel').slideUp(300);
 });
 
 // 管理面板
-$('#openAdminPanel').click(function() {
+$('#openAdminPanel').click(function () {
     // 使用slideToggle來進行平滑的顯示/隱藏
-    $('#adminPanel').toggle(50, function() {
+    $('#adminPanel').toggle(50, function () {
         // 在面板完全展開後，使用jQuery的animate方法平滑滾動到底部
         $('html, body').animate({
             scrollTop: $(document).height() - $(window).height()
         }, 200);
         $('#adminPassword').focus();
     });
-    
+
     // 如果已經登入，直接顯示管理區域
     if (isAdminLoggedIn) {
         $('#passwordSection').hide();
         $('#songManagementSection').show();
+        // 顯示所有管理輸入框和按鈕
+        $('#newSongId, #newSongName, #newSongLang, #newSongSinger, #addSongBtn, #loadFromSheetBtn').show();
     } else {
         $('#passwordSection').show();
         $('#songManagementSection').hide();
@@ -490,32 +560,34 @@ $('#openAdminPanel').click(function() {
 });
 
 // 驗證密碼
-$('#adminPassword').on('keydown', function(event) {
+$('#adminPassword').on('keydown', function (event) {
     if (event.key === 'Enter') {
         event.preventDefault(); // 防止按 Enter 觸發其他默認行為
         $('#verifyPasswordBtn').click(); // 模擬點擊驗證密碼按鈕
     }
 });
-$('#verifyPasswordBtn').click(function() {
+$('#verifyPasswordBtn').click(function () {
     const password = $('#adminPassword').val();
     const $btn = $(this);
     const originalText = $btn.text();
-    
+
     // 禁用按鈕並顯示載入指示器
     $btn.prop('disabled', true).html(loadingHtml);
-    
+
     // 使用本地測試URL
     const apiUrl = gasApiUrl;
-    
+
     // 確認是否要載入新的歌單
     $.get(apiUrl, {
-            action: "verifyPassword",
-            password: password
-        },
+        action: "verifyPassword",
+        password: password
+    },
         function (data) {
             if (data.success) {  // 根據你的 API 結果，這裡是 success 屬性
                 $('#passwordSection').hide();
                 $('#songManagementSection').show();
+                // 顯示所有管理輸入框和按鈕
+                $('#newSongId, #newSongName, #newSongLang, #newSongSinger, #addSongBtn, #loadFromSheetBtn').show();
                 // 在面板完全展開後，使用jQuery的animate方法平滑滾動到底部
                 $('html, body').animate({
                     scrollTop: $(document).height() - $(window).height()
@@ -523,7 +595,7 @@ $('#verifyPasswordBtn').click(function() {
                 isAdminLoggedIn = true;
                 saveSettings(); // 保存登入狀態
             } else {
-                alert('登入失敗: ' + data.message );
+                alert('登入失敗: ' + data.message);
             }
             // 恢復按鈕狀態
             $btn.prop('disabled', false).text(originalText);
@@ -537,17 +609,17 @@ $('#verifyPasswordBtn').click(function() {
 });
 
 // 新增歌曲
-$('#addSongBtn').click(function() {
+$('#addSongBtn').click(function () {
     let songId = $('#newSongId').val().trim();
     let songName = $('#newSongName').val().trim();
     let songLang = $('#newSongLang').val().trim();
     let songSinger = $('#newSongSinger').val().trim();
     const $btn = $(this);
     const originalText = "新增歌曲";
-    
+
     // 禁用按鈕並顯示載入指示器
     $btn.prop('disabled', true).html(loadingHtml);
-    
+
     // 如果ID或名稱為空，嘗試從另一個輸入框中解析多行文本
     // 若輸入框之一為空，嘗試從單輸入多資訊字串解析
     if ((!songId || !songName) && (songId || songName)) {
@@ -571,32 +643,32 @@ $('#addSongBtn').click(function() {
         songId = songId.replace(/\s+/g, '');
         songName = songName.replace(/\s+/g, '');
     }
-    
+
     if (songId && songName) {
         // 檢查是否已存在相同曲號和歌名
-        const existingSongWithSameIdAndName = availableSongs.find(song => 
+        const existingSongWithSameIdAndName = availableSongs.find(song =>
             song.id === songId && song.name === songName
         );
-        
+
         if (existingSongWithSameIdAndName) {
             // 恢復按鈕狀態
             $btn.prop('disabled', false).text(originalText);
             showFloatingMessage('已存在相同曲號和歌名的歌曲');
             return;
         }
-        
+
         // 檢查是否存在相同歌名但不同曲號
-        const existingSongWithSameName = availableSongs.find(song => 
+        const existingSongWithSameName = availableSongs.find(song =>
             song.name === songName && song.id !== songId
         );
-        
+
         // 檢查是否存在相同曲號但不同歌名
-        const existingSongWithSameId = availableSongs.find(song => 
+        const existingSongWithSameId = availableSongs.find(song =>
             song.id === songId && song.name !== songName
         );
-        
+
         let confirmMessage = '';
-        
+
         if (existingSongWithSameName) {
             confirmMessage = `已存在歌名「${songName}」但曲號不同的歌曲，確定要新增嗎？`;
         } else if (existingSongWithSameId) {
@@ -607,7 +679,7 @@ $('#addSongBtn').click(function() {
         } else {
             // 全新的歌曲，直接新增
             addNewSong(songId, songName, songLang, songSinger);
-            setTimeout(function() {
+            setTimeout(function () {
                 getSongs();
                 const $songList = $('#songList');
                 // 自動滾動到底部
@@ -615,11 +687,11 @@ $('#addSongBtn').click(function() {
             }, 1500);  // 延遲 1.5 秒執行 getSongs()
             return;
         }
-        
+
         // 需要確認的情況
         if (confirm(confirmMessage)) {
             addNewSong(songId, songName, songLang, songSinger);
-            setTimeout(function() {
+            setTimeout(function () {
                 getSongs();
                 const $songList = $('#songList');
                 // 自動滾動到底部
@@ -643,29 +715,29 @@ function addNewSong(songId, songName, songLang, songSinger) {
 }
 
 // 從Google Sheet載入歌單
-$('#loadFromSheetBtn').click(function() {
+$('#loadFromSheetBtn').click(function () {
     const $btn = $(this);
     const originalText = $btn.text();
-    
+
     // 禁用按鈕並顯示載入指示器
     $btn.prop('disabled', true).html(loadingHtml);
-    
+
     getSongs($btn, originalText);
 });
 
-function getSongs($btn, originalText){
+function getSongs($btn, originalText) {
     // 本地測試用URL
     const localApiUrl = 'http://localhost:8080/getSongs';
     // Google Apps Script部署後的URL (需要替換為實際部署的URL)
     // const gasApiUrl = 'https://script.google.com/macros/s/AKfycbzvR0oqjhxtcWbCo7KoyvryNNDFrw1BbzWPqatWxEr_jk1VYJf6H3-i-mLb-pVlZ4kA/exec';
-    
+
     // 使用本地測試URL
     const apiUrl = gasApiUrl;
-    
+
     // 確認是否要載入新的歌單
     $.get(apiUrl, {
-            action: "getSongs"
-        },
+        action: "getSongs"
+    },
         function (data) {
             if (Array.isArray(data)) {
                 // 更新歌曲列表
@@ -676,7 +748,7 @@ function getSongs($btn, originalText){
             } else {
                 alert('API返回格式錯誤');
             }
-            
+
             // 恢復按鈕狀態
             if ($btn) {
                 $btn.prop('disabled', false).text(originalText);
@@ -685,7 +757,7 @@ function getSongs($btn, originalText){
     ).fail(function (xhr, status, error) {
         alert('無法連接到API: ' + error);
         console.error('API錯誤:', xhr, status, error);
-        
+
         // 恢復按鈕狀態
         if ($btn) {
             $btn.prop('disabled', false).text(originalText);
@@ -696,25 +768,25 @@ function getSongs($btn, originalText){
 function addSongToSheet(songId, songName, songLang, songSinger) {
     const $btn = $('#addSongBtn');
     const originalText = "新增歌曲";
-    
+
     // 禁用按鈕並顯示載入指示器
     $btn.prop('disabled', true).html(loadingHtml);
-    
+
     // 本地測試用URL
     const localApiUrl = 'http://localhost:8080/addSong';
     // Google Apps Script部署後的URL (需要替換為實際部署的URL)
     // const gasApiUrl = 'https://script.google.com/macros/s/AKfycbzvR0oqjhxtcWbCo7KoyvryNNDFrw1BbzWPqatWxEr_jk1VYJf6H3-i-mLb-pVlZ4kA/exec';
-    
+
     // 使用本地測試URL
     const apiUrl = gasApiUrl;
     $.post(apiUrl, JSON.stringify({
-                action: "addSong",
-                password: $('#adminPassword').val(),
-                songId: songId,
-                songName: songName,
-                songLang: songLang,
-                songSinger: songSinger
-            }),
+        action: "addSong",
+        password: $('#adminPassword').val(),
+        songId: songId,
+        songName: songName,
+        songLang: songLang,
+        songSinger: songSinger
+    }),
         function (data) {
             console.log('API 回應: ' + JSON.stringify(data, null, 2)); // 格式化輸出
             if (data.success) {
@@ -723,13 +795,13 @@ function addSongToSheet(songId, songName, songLang, songSinger) {
                 $('#newSongId').val('');
                 $('#newSongName').val('');
             } else {
-                alert(`!!~ 歌曲新增失敗: ${data.message || '未知錯誤'}`);
+                alert(`!!~歌曲新增失敗: ${data.message || '未知錯誤'} `);
             }
             // 恢復按鈕狀態
             $btn.prop('disabled', false).text(originalText);
         }
     ).fail(function (xhr, status, error) {
-        alert(`!!~ 無法連接到API: ${error}`);
+        alert(`!!~無法連接到API: ${error} `);
         // 恢復按鈕狀態
         $btn.prop('disabled', false).text(originalText);
     });
@@ -737,7 +809,7 @@ function addSongToSheet(songId, songName, songLang, songSinger) {
 }
 
 // 字體大小控制
-$('#increaseFontBtn').click(function() {
+$('#increaseFontBtn').click(function () {
     if (currentFontSize < 24) {
         currentFontSize += 2;
         updateFontSize();
@@ -745,7 +817,7 @@ $('#increaseFontBtn').click(function() {
     }
 });
 
-$('#decreaseFontBtn').click(function() {
+$('#decreaseFontBtn').click(function () {
     if (currentFontSize > 12) {
         currentFontSize -= 2;
         updateFontSize();
@@ -754,7 +826,7 @@ $('#decreaseFontBtn').click(function() {
 });
 
 // 主題切換
-$('#themeToggle').change(function() {
+$('#themeToggle').change(function () {
     isDarkMode = $(this).is(':checked');
     if (isDarkMode) {
         document.body.classList.add('dark-mode');
@@ -770,10 +842,10 @@ renderSongList();
 renderSelectedList(); // Corrected function name
 
 // Centralized event handler for adding/removing songs
-$(document).on('click', '.btn-add, .remote-add', function() {
+$(document).on('click', '.btn-add, .remote-add', function () {
     const $btn = $(this);
     const songId = String($btn.data('id'));
-    
+
     if ($btn.prop('disabled')) return;
 
     const songName = $btn.data('name');
@@ -781,12 +853,12 @@ $(document).on('click', '.btn-add, .remote-add', function() {
     const songSinger = $btn.data('singer');
 
     selectedSongs.push({ id: songId, name: songName, lang: songLang, singer: songSinger });
-    
+
     renderSelectedList();
     saveSettings();
-    
+
     // Update button states in both local and remote lists without full refresh
-    $(`.song-item[data-id="${songId}"]`).find('.btn-add, .remote-add').text('已選').prop('disabled', true);
+    $(`.song - item[data - id="${songId}"]`).find('.btn-add, .remote-add').text('已選').prop('disabled', true);
 
     // Restore auto-fill feature for remote songs
     if ($btn.hasClass('remote-add')) {
@@ -798,7 +870,7 @@ $(document).on('click', '.btn-add, .remote-add', function() {
     }
 });
 
-$(document).on('click', '.btn-remove', function() {
+$(document).on('click', '.btn-remove', function () {
     const songId = String($(this).data('id'));
     const songObj = selectedSongs.find(s => s.id === songId);
     if (!songObj) return;
@@ -814,7 +886,7 @@ $(document).on('click', '.btn-remove', function() {
     selectedSongs = selectedSongs.filter(s => s.id !== songId);
     renderSelectedList();
     saveSettings();
-    $(`.song-item[data-id="${songId}"]`).find('.btn-add, .remote-add').text('+').prop('disabled', false);
+    $(`.song - item[data - id="${songId}"]`).find('.btn-add, .remote-add').text('+').prop('disabled', false);
 
     // Step 2: After the removal is complete, fill the form if the user requested it.
     if (saveInfo) {
@@ -828,15 +900,94 @@ $(document).on('click', '.btn-remove', function() {
 
 
 
+// 篩選函數
+function applyFilters(songs) {
+    let filtered = songs;
+
+    // 語言篩選
+    if (currentLangFilter !== 'all') {
+        filtered = filtered.filter(song => song.lang === currentLangFilter);
+    }
+
+    // 性別篩選
+    if (currentGenderFilter !== 'all') {
+        if (currentGenderFilter === 'male') {
+            filtered = filtered.filter(song => {
+                if (!song.singer) return false;
+                // 檢查歌手是否在男歌手列表中，或者包含男歌手名字
+                return maleSingers.some(male => song.singer.includes(male));
+            });
+        } else if (currentGenderFilter === 'female') {
+            filtered = filtered.filter(song => {
+                if (!song.singer) return false;
+                // 檢查歌手是否在女歌手列表中，或者包含女歌手名字
+                return femaleSingers.some(female => song.singer.includes(female));
+            });
+        }
+    }
+
+    return filtered;
+}
+
+// 篩選器切換按鈕
+$('#filterToggleBtn').click(function () {
+    const $filterSection = $('#filterSection');
+    const $chevron = $('#filterChevron');
+
+    if ($filterSection.hasClass('show')) {
+        $filterSection.removeClass('show');
+        $chevron.removeClass('rotated');
+    } else {
+        $filterSection.addClass('show');
+        $chevron.addClass('rotated');
+    }
+});
+
+// Custom Dropdown Logic
+$('.select-trigger').click(function (e) {
+    e.stopPropagation();
+    const $parent = $(this).parent();
+    $('.custom-select').not($parent).removeClass('open'); // Close others
+    $parent.toggleClass('open');
+});
+
+$(document).click(function () {
+    $('.custom-select').removeClass('open');
+});
+
+$('.option').click(function () {
+    const $option = $(this);
+    const $wrapper = $option.closest('.custom-select');
+    const value = $option.data('value');
+    const text = $option.text();
+
+    // Update trigger text
+    $wrapper.find('.select-trigger span').text(text);
+
+    // Update active state
+    $wrapper.find('.option').removeClass('selected');
+    $option.addClass('selected');
+
+    // Handle logic based on which dropdown it is
+    if ($wrapper.attr('id') === 'langSelectWrapper') {
+        currentLangFilter = value;
+        searchSongs();
+    } else if ($wrapper.attr('id') === 'genderSelectWrapper') {
+        currentGenderFilter = value;
+        searchSongs();
+    }
+
+    // Close dropdown
+    $wrapper.removeClass('open');
+});
+
 // 頁面加載時初始化
-$(document).ready(function() {
+$(document).ready(function () {
     // 從song.txt加載歌曲數據
     loadSongsFromFile();
 });
 
 // 將函數暴露到全局作用域，以便在HTML中調用
-//window.addSong = addSong;
-//window.removeSong = removeSong;
 window.loadHistory = loadHistory;
 window.deleteHistory = deleteHistory;
 window.saveToHistory = saveToHistory;
