@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Select Song</string>
+    <string name="title_activity_main">Select Song</string>
+    <string name="package_name">com.jimmyshian.selectsong</string>
+    <string name="custom_url_scheme">com.jimmyshian.selectsong</string>
+</resources>
