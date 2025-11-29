@@ -858,7 +858,7 @@ $(document).on('click', '.btn-add, .remote-add', function () {
     saveSettings();
 
     // Update button states in both local and remote lists without full refresh
-    $(`.song - item[data - id="${songId}"]`).find('.btn-add, .remote-add').text('已選').prop('disabled', true);
+    $(`.song-item[data-id="${songId}"]`).find('.btn-add, .remote-add').text('已選').prop('disabled', true);
 
     // Restore auto-fill feature for remote songs
     if ($btn.hasClass('remote-add')) {
