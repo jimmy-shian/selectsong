@@ -82,7 +82,10 @@ const maleSingers = [
   "施文彬",
   "周傳雄",
   "MP魔幻力量",
-  "五月天"
+  "五月天",
+  "理想混蛋",
+  "Tank",
+  "張信哲"
 ];
 const femaleSingers = [
   "陳潔儀",
@@ -134,11 +137,13 @@ const femaleSingers = [
   "徐佳瑩",
   "F.I.R.",
   "BY2",
-  "南拳媽媽"
+  "南拳媽媽",
+  "尤雅",
+  "李佳薇"
 ];
 const loadingHtml = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
 function loadSongsFromFile() {
-  fetch("./assets/song.txt").then((response) => {
+  fetch("song.txt").then((response) => {
     if (!response.ok) {
       throw new Error("無法讀取歌曲文件");
     }
@@ -768,7 +773,7 @@ $(document).on("click", ".btn-remove", function() {
   selectedSongs = selectedSongs.filter((s) => s.id !== songId);
   renderSelectedList();
   saveSettings();
-  $(`.song-item[data-id="${songId}"]`).find(".btn-add, .remote-add").text("+").prop("disabled", false);
+  $(`.song - item[data - id="${songId}"]`).find(".btn-add, .remote-add").text("+").prop("disabled", false);
   if (saveInfo) {
     if (!$("#adminPanel").is(":visible")) $("#openAdminPanel").click();
     $("#newSongId").val(songObj.id);

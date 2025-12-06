@@ -1,27 +1,17 @@
 {
-  "name": "capacitor-app",
+  "name": "selectsong",
   "version": "1.0.0",
-  "description": "An Amazing Capacitor App",
-  "type": "module",
-  "keywords": [
-    "capacitor",
-    "mobile"
-  ],
+  "description": "Select Song App",
   "scripts": {
-    "start": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "vite",
+    "build": "vite build"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
-    "@capacitor/camera": "latest",
-    "@capacitor/core": "^7.4.4",
-    "@capacitor/splash-screen": "latest"
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.4",
-    "vite": "^5.4.2"
-  },
-  "author": "",
-  "license": "ISC"
+    "vite": "^5.0.0"
+  }
 }

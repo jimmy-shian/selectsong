@@ -1,10 +1,5 @@
 {
 	"appId": "com.jimmyshian.selectsong",
 	"appName": "Select Song",
-	"webDir": "dist",
-	"plugins": {
-		"SplashScreen": {
-			"launchAutoHide": true
-		}
-	}
+	"webDir": "dist"
 }

@@ -32,7 +32,7 @@ const maleSingers = [
     '黃品源', '胡夏', '蘇打綠', '林俊傑',
     '庾澄慶', '蕭煌奇', '譚詠麟', '周興哲', '韋禮安',
     '楊培安', '陳奕迅', '郭桂彬', '施文彬', '周傳雄',
-    'MP魔幻力量', '五月天'
+    'MP魔幻力量', '五月天', '理想混蛋', 'Tank', '張信哲'
 ];
 const femaleSingers = [
     '陳潔儀', '黃乙玲', '江蕙', '家家', '田馥甄',
@@ -44,7 +44,8 @@ const femaleSingers = [
     '辛曉琪', 'S.H.E', '徐若瑄', '黃美珍', '陳盈潔',
     '孫燕姿', '郭靜', '戴愛玲', '李千娜', '曾沛慈',
     '葉蒨文', '林憶蓮', '郭采潔', '于文文', '梁心頤',
-    '袁詠琳', '徐佳瑩', 'F.I.R.', 'BY2', '南拳媽媽'
+    '袁詠琳', '徐佳瑩', 'F.I.R.', 'BY2', '南拳媽媽', 
+    '尤雅', '李佳薇'
 ];
 
 // 載入指示器樣式
@@ -52,7 +53,7 @@ const loadingHtml = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
 
 // 從song.txt文件加載歌曲數據
 function loadSongsFromFile() {
-    fetch('./assets/song.txt')
+    fetch('song.txt')
         .then(response => {
             if (!response.ok) {
                 throw new Error('無法讀取歌曲文件');
@@ -858,7 +859,7 @@ $(document).on('click', '.btn-add, .remote-add', function () {
     saveSettings();
 
     // Update button states in both local and remote lists without full refresh
-    $(`.song - item[data - id="${songId}"]`).find('.btn-add, .remote-add').text('已選').prop('disabled', true);
+    $(`.song-item[data-id="${songId}"]`).find('.btn-add, .remote-add').text('已選').prop('disabled', true);
 
     // Restore auto-fill feature for remote songs
     if ($btn.hasClass('remote-add')) {
