@@ -44,7 +44,7 @@ const femaleSingers = [
     '辛曉琪', 'S.H.E', '徐若瑄', '黃美珍', '陳盈潔',
     '孫燕姿', '郭靜', '戴愛玲', '李千娜', '曾沛慈',
     '葉蒨文', '林憶蓮', '郭采潔', '于文文', '梁心頤',
-    '袁詠琳', '徐佳瑩', 'F.I.R.', 'BY2', '南拳媽媽', 
+    '袁詠琳', '徐佳瑩', 'F.I.R.', 'BY2', '南拳媽媽',
     '尤雅', '李佳薇'
 ];
 
@@ -307,6 +307,17 @@ function saveToHistory() {
         return;
     }
 
+    const timestamp = new Date().toLocaleString();
+    const defaultName = timestamp;
+
+    // 彈出輸入框讓用戶輸入名稱
+    const inputName = prompt('請輸入歷史紀錄名稱（留空使用預設時間）:', defaultName);
+
+    // 用戶按取消則不保存
+    if (inputName === null) {
+        return;
+    }
+
     const $btn = $('#saveCurrentBtn');
     const originalText = $btn.text();
 
@@ -315,9 +326,12 @@ function saveToHistory() {
 
     // 模擬保存過程（實際上是立即的，但為了UI一致性添加短暫延遲）
     setTimeout(function () {
-        const timestamp = new Date().toLocaleString();
+        // 若用戶輸入為空則使用預設時間戳
+        const historyName = inputName.trim() || defaultName;
+
         const historyItem = {
             id: Date.now(), // 使用時間戳作為唯一ID
+            name: historyName, // 用戶輸入的名稱或預設時間
             timestamp: timestamp,
             songs: [...selectedSongs]
         };
@@ -485,18 +499,25 @@ function renderHistory() {
     }
 
     songHistory.forEach((history, index) => {
+        // 優先顯示 name，若無則使用 timestamp（向後相容）
+        const displayName = history.name || history.timestamp;
+        // 顯示時間戳（若 name 與 timestamp 不同則顯示）
+        const timeInfo = history.name && history.name !== history.timestamp
+            ? ` (${history.timestamp}, ${history.songs.length}首)`
+            : ` (${history.songs.length}首)`;
+
         const $historyItem = $(`
-    < div class="song-item" data - id="${history.id}" >
+            <div class="song-item" data-id="${history.id}">
                 <div>
                     <span class="song-number">${index + 1}.</span>
-                    <span>${history.timestamp} (${history.songs.length}首)</span>
+                    <span>${displayName}${timeInfo}</span>
                 </div>
                 <div class="song-actions">
                     <button class="btn" onclick="loadHistory(${history.id})">載入</button>
                     <button class="btn btn-remove" onclick="deleteHistory(${history.id})">刪除</button>
                 </div>
-            </div >
-    `);
+            </div>
+        `);
         $historyList.append($historyItem);
     });
 }

@@ -1,0 +1,111 @@
+# Build Android APK workflow
+name: Build Android APK
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Create package.json
+        run: |
+          cat > package.json << 'EOF'
+          {
+            "name": "selectsong",
+            "version": "1.0.0",
+            "description": "Select Song App",
+            "scripts": {}
+          }
+          EOF
+
+      - name: Install Capacitor
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Initialize Capacitor
+        run: |
+          cat > capacitor.config.json << 'EOF'
+          {
+            "appId": "com.jimmyshian.selectsong",
+            "appName": "歌曲選擇",
+            "webDir": "www",
+            "server": {
+              "androidScheme": "https"
+            }
+          }
+          EOF
+
+      - name: Prepare web assets
+        run: |
+          mkdir -p www
+          cp index.html www/
+          cp main.js www/
+          cp style.css www/
+          cp song.txt www/
+          cp -r img www/
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Setup app icon
+        run: |
+          # Convert and copy icon to all required sizes
+          # Install ImageMagick for image processing
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          
+          # Create icons for different densities
+          convert img/webicon.jpg -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert img/webicon.jpg -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert img/webicon.jpg -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert img/webicon.jpg -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert img/webicon.jpg -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
+          # Copy as foreground for adaptive icons
+          convert img/webicon.jpg -resize 108x108 android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png
+          convert img/webicon.jpg -resize 162x162 android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png
+          convert img/webicon.jpg -resize 216x216 android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png
+          convert img/webicon.jpg -resize 324x324 android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png
+          convert img/webicon.jpg -resize 432x432 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+          
+          # Round icons
+          convert img/webicon.jpg -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+          convert img/webicon.jpg -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+          convert img/webicon.jpg -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+          convert img/webicon.jpg -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+          convert img/webicon.jpg -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build APK (Debug)
+        working-directory: ./android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: selectsong-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
