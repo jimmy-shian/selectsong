@@ -37,6 +37,14 @@ body {
     transition: background-color 0.3s, color 0.3s;
 }
 
+/* Capacitor App 環境專用間距 */
+body.is-capacitor {
+    padding-top: 3.5rem;
+    /* 預留上間距 */
+    padding-bottom: 5rem;
+    /* 預留下間距 */
+}
+
 .container {
     max-width: 1200px;
     margin: 0 auto;

@@ -1007,6 +1007,15 @@ $('.option').click(function () {
 $(document).ready(function () {
     // 從song.txt加載歌曲數據
     loadSongsFromFile();
+
+    // 載入 localStorage 設定
+    loadSettings();
+
+    // 檢測是否為 Capacitor 環境（Android App）
+    if (window.Capacitor) {
+        document.body.classList.add('is-capacitor');
+        console.log('Running in Capacitor environment');
+    }
 });
 
 // 將函數暴露到全局作用域，以便在HTML中調用
