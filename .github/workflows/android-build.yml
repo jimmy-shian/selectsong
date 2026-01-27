@@ -49,7 +49,11 @@ jobs:
             "appName": "歌曲選擇",
             "webDir": "www",
             "server": {
-              "androidScheme": "https"
+              "url": "https://jimmy-shian.github.io/selectsong/",
+              "androidScheme": "https",
+              "allowNavigation": [
+                "jimmy-shian.github.io"
+              ]
             }
           }
           EOF

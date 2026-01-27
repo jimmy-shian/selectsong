@@ -54,6 +54,23 @@ const loadingHtml = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
 
 // 從song.txt文件加載歌曲數據
 function loadSongsFromFile() {
+    // 優先嘗試從 LocalStorage 加載快取
+    const cachedSongs = localStorage.getItem('cachedSongs');
+    if (cachedSongs) {
+        try {
+            const parsedSongs = JSON.parse(cachedSongs);
+            if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
+                availableSongs = parsedSongs;
+                renderSongList();
+                console.log('已從 LocalStorage 加載快取歌曲數據');
+                showFloatingMessage('已載入上次更新的歌單');
+                return; // 成功加載快取後直接返回，不需再讀取文件
+            }
+        } catch (e) {
+            console.error('無法解析快取歌曲數據', e);
+        }
+    }
+
     fetch('song.txt')
         .then(response => {
             if (!response.ok) {
@@ -765,9 +782,13 @@ function getSongs($btn, originalText) {
             if (Array.isArray(data)) {
                 // 更新歌曲列表
                 availableSongs = data;
+
+                // 儲存到 LocalStorage
+                localStorage.setItem('cachedSongs', JSON.stringify(availableSongs));
+
                 renderSongList();
                 // 顯示 1.5 秒的懸浮訊息
-                showFloatingMessage(`成功從 API 載入 ${data.length} 首歌曲`);
+                showFloatingMessage(`成功從 API 載入 ${data.length} 首歌曲，並已儲存到本地`);
             } else {
                 alert('API返回格式錯誤');
             }
